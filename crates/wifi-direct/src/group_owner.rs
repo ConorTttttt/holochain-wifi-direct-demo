@@ -11,10 +11,12 @@
 //! crosses apartments. The group stops when the [`GroupOwner`] is dropped or
 //! the process exits.
 //!
-//! A Wi-Fi Direct (P2P) device asking to connect, rather than joining as a
-//! legacy client, raises `WiFiDirectConnectionListener.ConnectionRequested`.
-//! This build records those requests in [`GroupOwner::events`] for
-//! diagnosis and does not accept them.
+//! Windows raises `WiFiDirectConnectionListener.ConnectionRequested` when a
+//! device connects to the group. A legacy client raises it too: on the first
+//! hardware run, the requests came from the Ubuntu PC's own Wi-Fi MAC as it
+//! associated, and once more during the run, and the client stayed connected
+//! without the request being accepted. This build only records the requests, in
+//! [`GroupOwner::events`]; the pairing exchange decides who is let in.
 
 use crate::{Result, WifiError};
 use std::net::Ipv4Addr;
@@ -382,7 +384,8 @@ mod windows_impl {
             ))
             .map_err(winrt("watching the publisher status"))?;
 
-        // P2P devices ask here; legacy clients never do. Recorded only.
+        // Legacy clients joining show up here too. Recorded only: a legacy
+        // client needs no acceptance, and pairing authorizes the peer.
         let listener = WiFiDirectConnectionListener::new()
             .map_err(winrt("creating the connection listener"))?;
         let event_log = events.clone();
@@ -398,8 +401,8 @@ mod windows_impl {
                             .map(|name| name.to_string())
                             .unwrap_or_else(|_| "an unnamed device".into());
                         event_log.lock().expect("poisoned").push(format!(
-                            "Wi-Fi Direct (P2P) connection request from {name} ignored: \
-                             this build accepts legacy WPA2 clients only"
+                            "device {name} is connecting to the group (legacy clients need no \
+                             acceptance; pairing decides who is let in)"
                         ));
                     }
                     Ok(())

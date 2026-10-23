@@ -47,9 +47,11 @@ why this API fits it.
   with its likely cause.
 - After `Start`, the SSID and passphrase are read back from
   `LegacySettings`, and those values go into the QR code.
-- A `WiFiDirectConnectionListener` records P2P connection requests, which
-  legacy clients never make. They are logged as ignored; native P2P
-  negotiation (mode A below) is not built.
+- A `WiFiDirectConnectionListener` records connection requests. Windows
+  raises one for a legacy client too: on the first hardware run, it came
+  from the Ubuntu PC's own Wi-Fi MAC as it joined, and once more during the
+  run, and the client stayed connected without the request being accepted. Requests
+  are only logged. Accepting a native P2P client (mode A below) is not built.
 - The group adapter's address comes from `GetAdaptersAddresses`: the first
   IPv4 address on a "Wi-Fi Direct" adapter that was not up before the group
   started. See [qr-pairing.md](qr-pairing.md#the-address-problem) for when it

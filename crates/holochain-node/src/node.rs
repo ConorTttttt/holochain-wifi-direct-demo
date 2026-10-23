@@ -445,6 +445,7 @@ pub async fn run_exchange(
             }
         }
 
+        let mut lines = Vec::new();
         if let Err(err) = poll_notes(
             node,
             peer_name,
@@ -453,10 +454,23 @@ pub async fn run_exchange(
             &mut peer_manifest,
             &mut peer_receipt,
             &mut peer_notes,
+            &mut lines,
         )
         .await
         {
             debug!(?err, "Polling notes failed");
+        }
+        // A note from the peer means a connection exists by now; say so
+        // before reporting what came over it.
+        if connected_after.is_none()
+            && !lines.is_empty()
+            && node.connection_to(peer_endpoint).await.is_some()
+        {
+            connected_after = Some(start.elapsed());
+            on_connected();
+        }
+        for line in lines {
+            println!("{line}");
         }
 
         let inbound_complete = peer_manifest
@@ -572,6 +586,7 @@ async fn poll_notes(
     peer_manifest: &mut Option<Manifest>,
     peer_receipt: &mut Option<Manifest>,
     peer_notes: &mut BTreeMap<String, ReadNote>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let local: HashSet<ActionHash> = node
         .call::<_, Vec<ActionHash>>("list_local_note_hashes", ())
@@ -613,10 +628,10 @@ async fn poll_notes(
             if rest == peer_name {
                 match serde_json::from_str::<Manifest>(&note.body) {
                     Ok(manifest) => {
-                        println!(
+                        out.push(format!(
                             "manifest  {peer_name} sent {} note(s)",
                             manifest.notes.len()
-                        );
+                        ));
                         *peer_manifest = Some(manifest);
                     }
                     Err(err) => warn!(?err, "Unreadable manifest from {peer_name}"),
@@ -628,10 +643,10 @@ async fn poll_notes(
             if rest == peer_name {
                 match serde_json::from_str::<Manifest>(&note.body) {
                     Ok(receipt) => {
-                        println!(
+                        out.push(format!(
                             "receipt   {peer_name} confirms it read {} of our note(s)",
                             receipt.notes.len()
-                        );
+                        ));
                         *peer_receipt = Some(receipt);
                     }
                     Err(err) => warn!(?err, "Unreadable receipt from {peer_name}"),
@@ -646,7 +661,7 @@ async fn poll_notes(
             found_after: start.elapsed(),
             held_locally: local.contains(&action_hash),
         };
-        println!(
+        out.push(format!(
             "read      {} ({} bytes) from {} after {:.1}s: {}, {}",
             note.label,
             read.digest.bytes,
@@ -662,7 +677,7 @@ async fn poll_notes(
             } else {
                 "fetched on demand"
             },
-        );
+        ));
         peer_notes.insert(note.label.clone(), read);
     }
     Ok(())
