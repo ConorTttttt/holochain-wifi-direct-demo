@@ -87,12 +87,13 @@ kitsune2 0.5 for its default builder, whose transport is
 kitsune2 0.5.2 can not run without a relay: it learns its own peer URL only
 from the relay, and dials peers only through the relay in their URL. So
 [ConorTttttt/kitsune2 `feature/wifi-direct-0.5`](https://github.com/ConorTttttt/kitsune2/tree/feature/wifi-direct-0.5)
-(commit `b340822`, one commit on top of the BLE branch) adds one setting,
+(commit `c700b35`, four commits on top of the BLE branch) adds one setting,
 `irohTransport.directBindAddr`:
 
 - the endpoint is built with `RelayMode::Disabled`, `clear_ip_transports()`
-  and `bind_addr(<directBindAddr>)`, so it has one UDP socket, bound to the
-  Wi-Fi Direct address, and no relay or address lookup;
+  and `bind_addr(<directBindAddr>)`, so peer traffic uses one UDP socket,
+  bound to the Wi-Fi Direct address, with no relay or address lookup (plus
+  the loopback socket described under [Link outages](#link-outages));
 - its peer URL is `http://<ip>:<port>/direct/<endpoint-id>`, known as soon as
   it binds;
 - dialling such a URL gives iroh exactly that socket address and endpoint ID:
@@ -113,6 +114,58 @@ Agent infos are re-signed every minute with 18 of their 20 minutes left, so
 after a link drop a fresh one exists within about 2 minutes. This matters
 because kitsune2 marks a peer that failed to connect as unresponsive until a
 newer agent info for it arrives.
+
+### Link outages
+
+The first hardware run showed that a link outage killed a node for good.
+After the Ubuntu client left, the Windows group adapter's address was briefly
+gone. iroh rebinds its sockets on every network change, and the rebind of the
+socket bound to that address failed (`AddrNotAvailable`). Every receive then
+errored, and after eight in a row iroh shut the endpoint down ("All transports
+failed to receive"). The same happens on Ubuntu whenever its link drops.
+kitsune2 commit `c700b35` fixes it in three parts:
+
+- **A loopback socket** (`127.0.0.1:<random>`, or `[::1]` for IPv6) is bound
+  beside the link socket. iroh routes it only for its own address, and it is
+  not a default route, so no peer traffic uses it. Because it never loses its
+  address, the endpoint keeps receiving through the outage, and iroh rebinds
+  the link socket when the address returns. iroh lists it among its local
+  addresses, but a loopback candidate can never form a path between two
+  machines. With a loopback `directBindAddr`, as in the loopback tests, no
+  extra socket is added.
+- **No blame for a local outage.** While the link address is on no interface,
+  new outbound connections are skipped without marking the peer
+  unresponsive. Otherwise the node would not dial the peer again after the
+  link came back, until the peer's agent info expired.
+- **Fresh connections after the outage.** A QUIC connection that lived
+  through the outage could come back half-working. Its only path could not be
+  closed while the address was gone (noq: `failed closing path:
+  LastOpenPath`), and afterwards data sometimes flowed one way only: in one
+  of five test runs, gossip then timed out until the run failed. The node
+  now checks every second whether its link address is assigned. When it
+  returns, the node closes every connection gracefully (so the peer does not
+  mark it unresponsive), and the next send reconnects.
+
+Two tests reproduce the outage without hardware and without `sudo`:
+
+- `kitsune2_transport_iroh`'s `direct_endpoint_survives_its_link_address_going_away`
+  deletes and restores an address in a private network namespace while other
+  addresses come and go. It fails with "All transports failed to receive"
+  without the loopback socket, and with a connect timeout without the guard.
+  It passes with both.
+- This repository's `scripts/outage-test.sh` runs two real `hc-wfd` nodes, each
+  in its own namespace joined by a virtual Ethernet pair, like two machines
+  sharing only one link. It removes the joiner's address for 45 s, then the
+  host's for 45 s, while both keep writing notes. Nothing arrives during
+  either outage. Within seconds of each address returning, the backlog
+  arrives, and both nodes pass 10 notes each way, byte for byte: 5 of 5 runs
+  with all three parts of the fix. Without the third part, 1 of 5 runs failed
+  as described above. It is not a Wi-Fi Direct test; hardware test I is.
+
+The side that still has its address may mark the other unresponsive during
+the outage. That clears once the returning node connects again and delivers
+its re-signed agent info, within about 2 minutes. Gossip started by the
+returning node carries data both ways in the meantime.
 
 ## The DHT exchange
 
@@ -143,9 +196,10 @@ peer's: a real QUIC connection, not the QR scan or the pairing exchange.
 
 ## What proves the traffic used Wi-Fi Direct
 
-1. **By construction.** The only UDP socket is bound to the Wi-Fi Direct
-   address, there is no relay, and the route to the peer is the Wi-Fi Direct
-   interface with no gateway. Ubuntu's join checks the route itself.
+1. **By construction.** The only non-loopback UDP socket is bound to the
+   Wi-Fi Direct address, there is no relay, and the route to the peer is the
+   Wi-Fi Direct interface with no gateway. Ubuntu's join checks the route
+   itself.
 2. **The reports** show `transport iroh-direct at http://<link-ip>:47001/…`,
    `direct IP path: true`, and non-zero bytes for the connection to the peer.
 3. **Independently:** `scripts/ubuntu-verify-link.sh` captures with

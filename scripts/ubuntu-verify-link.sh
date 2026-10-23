@@ -7,7 +7,8 @@
 # Run it while `hc-wfd join` is exchanging notes. It checks the route the
 # kernel picks for PEER_IP (the Wi-Fi Direct interface, no gateway), the
 # Wi-Fi association (a DIRECT- SSID through an hc-wfd-* profile), that
-# hc-wfd's only UDP socket is bound on that link, and then captures UDP_PORT
+# hc-wfd's only non-loopback UDP socket is bound on that link (it also keeps a
+# loopback socket that survives link outages), and then captures UDP_PORT
 # (default 47001) on every interface for SECONDS (default 30, needs sudo) and
 # counts packets per interface. Every packet should be on the Wi-Fi Direct
 # interface. Capture lines are saved to wfd-capture-<time>.txt here; they
@@ -59,10 +60,13 @@ if [[ -z "$sockets" ]]; then
   fail "no hc-wfd UDP socket found; is hc-wfd join running?"
 else
   sed 's/^/      /' <<< "$sockets"
-  if [[ "$(wc -l <<< "$sockets")" == 1 ]] && grep -q "$src:$port " <<< "$sockets"; then
-    pass "hc-wfd's only UDP socket is bound to $src:$port on $dev"
+  # Besides its link socket, the endpoint keeps a loopback socket that only
+  # keeps it alive through link outages and can not reach another machine.
+  external="$(awk '{print $4}' <<< "$sockets" | grep -vE '^(127\.|\[::1\]:)' || true)"
+  if [[ "$(grep -c . <<< "$external")" == 1 && "$external" == "$src:$port" ]]; then
+    pass "hc-wfd's only non-loopback UDP socket is bound to $src:$port on $dev"
   else
-    fail "expected exactly one hc-wfd UDP socket, bound to $src:$port"
+    fail "expected exactly one non-loopback hc-wfd UDP socket, bound to $src:$port"
   fi
 fi
 tcp="$(ss -tanp 2> /dev/null | grep '"hc-wfd"' | awk '{print $1, $4, $5}' || true)"

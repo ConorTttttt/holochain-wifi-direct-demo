@@ -48,6 +48,7 @@ scripts/ubuntu-build.sh
 BIN=$HOME/.cache/holochain-wifi-direct-demo/target/release/hc-wfd
 $BIN --version
 scripts/loopback-test.sh      # regression on this machine only: NOT Wi-Fi Direct
+scripts/outage-test.sh        # link outages between two network namespaces: NOT Wi-Fi Direct
 ```
 
 ## 1. The Wi-Fi Direct link
@@ -145,7 +146,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows-verify-link.ps1 -PeerIp
 ```
 
 Pass: both report the route on the Wi-Fi Direct interface with no gateway,
-and hc-wfd's single UDP socket on the link address. Ping may fail, because
+and hc-wfd's only non-loopback UDP socket on the link address. Ping may fail, because
 Windows blocks ICMP by default; that is not required. Milestone 1 passes with
 A to D.
 

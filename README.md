@@ -28,8 +28,9 @@ Windows: hc-wfd create                          Ubuntu: hc-wfd join --qr-image i
 | Windows group owner and adapter address | **PASS** (2026-10-23) | Group `DIRECT-hc-…` on 5 GHz (5745 MHz). The adapter had `192.168.137.1` when the group started, so the QR code carried the host's endpoint |
 | Windows build of `hc-wfd.exe` | **PASS** | Built and ran `create`. Windows Firewall rules: not yet checked from the Windows side |
 | Milestone 1: real Windows–Ubuntu Wi-Fi Direct IP link | **PASS** (2026-10-23) | Ubuntu: associated to the `DIRECT-` SSID (`iw`: Wi-Fi 6, 80 MHz, −54 dBm); DHCP `192.168.137.24/24` from Windows; `ip route get 192.168.137.1` → `dev wlp0s20f3`, no gateway; default route stayed on Ethernet. Ping: no reply (Windows blocks ICMP; not required). `windows-verify-link.ps1` not yet run |
-| Milestone 2: authenticated QR pairing over Wi-Fi Direct | **E PASS**, J not yet run | QR PNG imported on Ubuntu; Noise pairing to `192.168.137.1:47002`; endpoint matched the QR code; pairing connection closed afterwards. Expiry and reuse refusal (J) not yet run on hardware |
-| Milestone 3: Holochain DHT both ways over Wi-Fi Direct | **F, G PASS** for 1 × 1 kB each way; **capture, H, I, K not yet run** | Ubuntu: `Peer Connected: Windows` 4.2 s after pairing; `transport iroh-direct`, `direct IP path: true`, about 31 kB each way; Windows → Ubuntu read byte for byte, Ubuntu → Windows confirmed by Windows' receipt; `RESULT PASS (both directions over the Wi-Fi Direct link)`. The process's only UDP socket was `192.168.137.24:47001` (`ss`). Windows' own report agrees: `RESULT PASS` both ways on 'Microsoft Wi-Fi Direct Virtual Adapter #4' `192.168.137.1/24`, `Peer Connected: Ubuntu` after 5.3 s, and its QUIC connection to Ubuntu came up `direct=true` in 63 ms. Still needed for the final PASS: a packet capture on the Wi-Fi Direct interface, the run with internet off (H), reconnection (I), large entries (K) |
+| Milestone 2: authenticated QR pairing over Wi-Fi Direct | **E, J PASS** except host-side expiry (run C) | Run 1 and run A (2026-10-23): QR PNG imported on Ubuntu; Noise pairing to `192.168.137.1:47002`; endpoint matched the QR code; pairing port closed afterwards. J: a second join with a copy of the used QR code reached the Wi-Fi group but could not pair (port closed); a QR code 10 min past expiry was refused by Ubuntu. Not yet run: Windows refusing an expired code (`create --expires-min 1`) |
+| Milestone 3: Holochain DHT both ways over Wi-Fi Direct | **F, G, H, K PASS**; **capture and I not yet run** | Run 1: 1 × 1 kB each way, `Peer Connected` after 4–5 s, `direct IP path: true`, both reports PASS. Run A, Windows off every other network (its log: `failed to retrieve default route: NoRoute`; Ubuntu kept Ethernet, which does not reach Windows): 3 × 1 MB each way, every byte matched, about 6 MB over the link each way, group on 2.4 GHz, both reports PASS. Still needed for the final PASS: a packet capture on the Wi-Fi Direct interface, and reconnection (I) with the outage fixes below |
+| Recovery from link outages (kitsune2 `c700b35`) | **READY**, simulated | Run A's log showed Windows' iroh endpoint dying for good after its group adapter's address briefly went away. Fixed in kitsune2 in three parts (loopback socket, no blame for a local outage, fresh connections when the address returns; see [docs/architecture.md](docs/architecture.md#link-outages)). `scripts/outage-test.sh`: two nodes in separate network namespaces, each node's address removed for 45 s in turn, 10 notes each way: **5 of 5 runs PASS** (before the third part: 1 of 5 failed). **Not a Wi-Fi Direct result**; hardware test I is still to run |
 | Native P2P negotiation on Ubuntu (mode A), Android, iOS, GUI | Not built | [docs/future.md](docs/future.md) |
 
 Answered by the first hardware run (2026-10-23): Windows gives the group
@@ -52,10 +53,13 @@ owner serves DHCP to legacy clients. The fallbacks for other behaviour
   versions as the BLE demo. One iroh endpoint, owned by kitsune2, on iroh's
   native UDP/QUIC. kitsune2 0.5.2 can only run with a relay, so this uses
   [ConorTttttt/kitsune2 `feature/wifi-direct-0.5`](https://github.com/ConorTttttt/kitsune2/tree/feature/wifi-direct-0.5)
-  (`b3408224`). It adds one setting, `directBindAddr`: one socket bound to the
-  Wi-Fi Direct address, no relay, and peer URLs of the form
-  `http://<ip>:<port>/direct/<endpoint-id>`. The BLE transport is not used;
-  its feature is never turned on.
+  (`c700b35`). It adds one setting, `directBindAddr`: peer traffic goes
+  through one socket bound to the Wi-Fi Direct address, there is no relay,
+  and peer URLs take the form `http://<ip>:<port>/direct/<endpoint-id>`. A
+  loopback socket beside it keeps the endpoint alive while the link address
+  is briefly gone (found in the hardware run; see
+  [docs/architecture.md](docs/architecture.md#link-outages)). The BLE
+  transport is not used; its feature is never turned on.
 - **Pairing.** The QR code carries the group's credentials, a 32-byte
   single-use secret, a session ID and, when known, the host's endpoint ID.
   The joiner proves it holds the secret through a Noise PSK handshake, which

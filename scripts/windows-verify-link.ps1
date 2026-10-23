@@ -5,7 +5,8 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\windows-verify-link.ps1 -PeerIp <Ubuntu link address> [-Port 47001] [-Seconds 30]
 #
 # Checks the route Windows picks for PeerIp (a Wi-Fi Direct virtual adapter,
-# no gateway) and that hc-wfd's only UDP socket is bound on that adapter.
+# no gateway) and that hc-wfd's only non-loopback UDP socket is bound on that
+# adapter (it also keeps a loopback socket that survives link outages).
 # Then captures UDP -Port with pktmon for -Seconds, prints packet counters
 # per adapter, and saves wfd-capture-<time>.pcapng for Wireshark (filter
 # udp.port == 47001; the payload is encrypted QUIC).
@@ -41,10 +42,13 @@ if (-not $proc) {
 } else {
     $udp = @(Get-NetUDPEndpoint -OwningProcess $proc.Id -ErrorAction SilentlyContinue)
     $udp | ForEach-Object { Write-Host "      UDP $($_.LocalAddress):$($_.LocalPort)" }
-    if ($udp.Count -eq 1 -and $source -and $udp[0].LocalAddress -eq $source.IPAddress -and $udp[0].LocalPort -eq $Port) {
-        Pass "hc-wfd's only UDP socket is bound to $($source.IPAddress):$Port on the Wi-Fi Direct adapter"
+    # Besides its link socket, the endpoint keeps a loopback socket that only
+    # keeps it alive through link outages and can not reach another machine.
+    $external = @($udp | Where-Object { $_.LocalAddress -ne "127.0.0.1" -and $_.LocalAddress -ne "::1" })
+    if ($external.Count -eq 1 -and $source -and $external[0].LocalAddress -eq $source.IPAddress -and $external[0].LocalPort -eq $Port) {
+        Pass "hc-wfd's only non-loopback UDP socket is bound to $($source.IPAddress):$Port on the Wi-Fi Direct adapter"
     } else {
-        Fail "expected exactly one hc-wfd UDP socket, bound to $($source.IPAddress):$Port"
+        Fail "expected exactly one non-loopback hc-wfd UDP socket, bound to $($source.IPAddress):$Port"
     }
     Get-NetTCPConnection -OwningProcess $proc.Id -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "      TCP $($_.LocalAddress):$($_.LocalPort) -> $($_.RemoteAddress):$($_.RemotePort) $($_.State)" }
 }
