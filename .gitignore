@@ -1,0 +1,29 @@
+# Build output
+target/
+dna/target/
+dna/workdir/zomes/
+dna/workdir/*.dna
+
+# Conductor state: databases, lair keystores, agent infos
+data/
+hcw/
+agent-info*.json
+
+# Live invitations: QR images and texts hold the Wi-Fi passphrase and the
+# pairing secret
+invite*.png
+invite*.txt
+*-qr.png
+
+# Logs and captures, which hold agent keys, endpoint IDs and device addresses
+*.log
+*.out
+*.err
+*.pcap
+*.pcapng
+*.etl
+wfd-capture-*
+results/
+
+# Local-only Cargo overrides
+.cargo/

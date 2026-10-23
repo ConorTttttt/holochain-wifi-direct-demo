@@ -1,0 +1,24 @@
+[package]
+name = "hcwfd-pairing"
+description = "QR invitations and the authenticated pairing exchange for Holochain over Wi-Fi Direct"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64.workspace = true
+ed25519-dalek.workspace = true
+getrandom.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# The Noise Protocol Framework, for the pairing channel's PSK handshake.
+# Only the primitives Noise_NNpsk0_25519_ChaChaPoly_SHA256 needs.
+snow = { version = "0.10", default-features = false, features = [
+  "std",
+  "use-chacha20poly1305",
+  "use-sha2",
+  "use-curve25519",
+  "use-getrandom",
+] }
+zeroize = "1"

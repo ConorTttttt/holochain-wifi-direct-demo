@@ -1,0 +1,14 @@
+manifest_version: "0"
+name: ble_probe
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: probe_integrity
+      path: ./zomes/integrity/probe_integrity.wasm
+coordinator:
+  zomes:
+    - name: probe
+      path: ./zomes/coordinator/probe.wasm
+      dependencies:
+        - name: probe_integrity

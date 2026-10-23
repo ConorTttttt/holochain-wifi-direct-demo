@@ -1,0 +1,5 @@
+# The toolchain holochain-ble-node was built and tested with on Ubuntu.
+# rustup installs it on first use, on Windows as on Linux.
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"

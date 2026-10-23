@@ -1,0 +1,13 @@
+manifest_version: "0"
+name: ble_probe
+description: "Notes written on one conductor and read back on another, to test Holochain over BLE"
+roles:
+  - name: probe
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "../../dna/workdir/ble_probe.dna"
+      modifiers:
+        network_seed: "holochain-ble-demo"
+        properties: ~

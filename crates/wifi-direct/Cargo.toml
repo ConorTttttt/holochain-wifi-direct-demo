@@ -1,0 +1,24 @@
+[package]
+name = "hcwfd-wifi"
+description = "Windows Wi-Fi Direct group owner and Ubuntu NetworkManager joiner for Holochain over Wi-Fi Direct"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+# WinRT's Windows.Devices.WiFiDirect for the group owner, and IP Helper for
+# the group adapter's address. The same version Holochain's tree already uses.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+  "Devices_Enumeration",
+  "Devices_WiFiDirect",
+  "Foundation",
+  "Security_Credentials",
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+  "Win32_System_WinRT",
+] }

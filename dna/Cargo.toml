@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "zomes/integrity/probe_integrity",
+    "zomes/coordinator/probe",
+]
+
+[workspace.dependencies]
+hdi = "=0.8.0"
+hdk = "=0.7.0"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = "z"
+lto = true

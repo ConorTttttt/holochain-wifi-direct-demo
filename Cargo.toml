@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = ["crates/pairing", "crates/wifi-direct", "crates/holochain-node"]
+# The probe zomes build for wasm32 in their own workspace; see scripts/build-happ.sh.
+exclude = ["dna"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+base64 = "0.22"
+ed25519-dalek = "2"
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[patch.crates-io]
+# kitsune2 0.5.2 plus its relay-free direct IP mode (`directBindAddr`):
+# ConorTttttt/kitsune2, branch feature/wifi-direct-0.5. Every kitsune2 crate
+# comes from the same commit, so holochain links exactly one copy of each.
+kitsune2 = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_api = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_bootstrap_client = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_bootstrap_srv = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_core = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_dht = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_gossip = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+kitsune2_transport_iroh = { git = "https://github.com/ConorTttttt/kitsune2", rev = "b3408224b07aa51e41d97b7c13d437aa82829479" }
+# kitsune2_transport_iroh's `ble` feature, and with it the BLE stack
+# (iroh-ble-transport, blew), is never turned on here: Wi-Fi Direct uses
+# iroh's own UDP/QUIC. Cargo.lock started from holochain-ble-demo's, so every
+# other crate is the version that build was tested with.
+
+[profile.release]
+debug = "line-tables-only"
